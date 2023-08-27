@@ -61,7 +61,7 @@ pub fn main() !void {
     pp.type = "RSA PRIVATE";
     try pp.headers.put("TTTYYY", "dghW66666");
     try pp.headers.put("Proc-Type", "4,Encond");
-    pp.bytes = []const u8;
+    pp.bytes = "pem bytes";
 
     const allocator = std.heap.page_allocator;
     var encoded3 = try pem.encode(allocator, pp);

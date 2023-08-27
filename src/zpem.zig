@@ -4,23 +4,23 @@ const fmt = std.fmt;
 const mem = std.mem;
 const sort = std.sort;
 const base64 = std.base64;
+const StringHashMap = std.hash_map.StringHashMap;
 const Allocator = mem.Allocator;
 
 const bytes = @import("bytes.zig");
 
-/// Convenience type that contains the `AsnType`
-/// and the base64 decoded content of the file.
+/// pem block data.
 pub const Block = struct {
-    /// The type
+    /// The pem type.
     type: []const u8,
     /// Optional headers.
-    headers: std.hash_map.StringHashMap([]const u8),
-    /// Decoded content of a PEM file
+    headers: StringHashMap([]const u8),
+    /// Decoded content of a PEM file.
     bytes: []const u8,
 
     /// init
     pub fn init(allocator: Allocator) Block {
-        var headers = std.hash_map.StringHashMap([]const u8).init(allocator);
+        var headers = StringHashMap([]const u8).init(allocator);
         
         return .{
             .type = "",
@@ -31,7 +31,7 @@ pub const Block = struct {
 
     /// initWithType
     pub fn initWithType(allocator: Allocator, type_line: []const u8) Block {
-        var headers = std.hash_map.StringHashMap([]const u8).init(allocator);
+        var headers = StringHashMap([]const u8).init(allocator);
         
         return .{
             .type = type_line,
@@ -50,6 +50,7 @@ pub const Block = struct {
     }
 };
 
+// pem errors
 pub const Error = error {
     NotPemData,
     PemDataEmpty,
@@ -86,13 +87,7 @@ pub fn decode(allocator: Allocator, data: []const u8) (Error || Allocator.Error 
 
         rest = line_data.rest;
         
-        var headers = std.hash_map.StringHashMap([]const u8).init(allocator);
-        
-        var p = Block{
-            .type = type_line,
-            .headers = headers,
-            .bytes = "",
-        };
+        var p = Block.initWithType(allocator, type_line);
         
         while (true) {
             if (rest.len == 0) {
@@ -175,28 +170,6 @@ fn writeHeader(allocator: Allocator, k: []const u8, v: []const u8) ![:0]u8 {
     return buf.toOwnedSliceSentinel(0);
 }
 
-pub fn string_asc(comptime T: type) fn (void, T, T) bool {
-    return struct {
-        pub fn inner(_: void, a: T, b: T) bool {
-            if (a.len < b.len) {
-                for (a, 0..) |aa, i| {
-                    if (aa > b[i]) {
-                        return false;
-                    }
-                }
-            } else {
-                for (b, 0..) |bb, j| {
-                    if (bb < a[j]) {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-    }.inner;
-}
-
 /// Encodes pem bytes.
 pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
     var headers1 = (try b.headers.clone()).iterator();
@@ -249,8 +222,8 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
             h = h[0..];
         }
 
-        // todo: fiexed strings sort.
-        sort.block([]const u8, h, {}, string_asc([]const u8));
+        // strings sort a to z
+        sort.block([]const u8, h, {}, stringSort([]const u8));
         
         for (h) |k| {
             if (b.headers.get(k) != null) {
@@ -287,6 +260,28 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
     try buf.appendSlice("-----\n");
 
     return buf.toOwnedSliceSentinel(0);
+}
+
+pub fn stringSort(comptime T: type) fn (void, T, T) bool {
+    return struct {
+        pub fn inner(_: void, a: T, b: T) bool {
+            if (a.len < b.len) {
+                for (a, 0..) |aa, i| {
+                    if (aa > b[i]) {
+                        return false;
+                    }
+                }
+            } else {
+                for (b, 0..) |bb, j| {
+                    if (bb < a[j]) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+    }.inner;
 }
 
 test "ASN.1 type CERTIFICATE" {
