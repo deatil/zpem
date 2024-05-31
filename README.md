@@ -1,22 +1,16 @@
 ## zpem 
 
-zpem 是一个使用 zig 语言解析生成 pem 格式证书的通用库
+A pem parse and encode library for Zig.
 
 
-### 环境要求
+### Env
 
- - Zig >= 0.11
+ - Zig >= 0.12
 
 
-### 下载安装
+### Get Starting
 
-~~~cmd
-git clone github.com/deatil/zpem
-~~~
-
-### 开始使用
-
-解析 pem 格式证书
+* parse pem
 
 ~~~zig
 const std = @import("std");
@@ -42,21 +36,25 @@ pub fn main() !void {
     var p = try pem.decode(allocator, bytes);
     defer p.deinit(allocator);
 
-    std.debug.print("pem type data: {s}\n", .{p.type});
+    std.debug.print("pem type: {s}\n", .{p.type});
+    std.debug.print("pem bytes: {x}\n", .{p.bytes});
 
-    var header = p.headers.get("ABC").?;
-    std.debug.print("pem header data: {s}\n", .{header});
+    // get header data
+    const header = p.headers.get("ABC").?;
+    std.debug.print("pem header: {s}\n", .{header});
 }
 ~~~
 
-生成 pem 格式证书
+* encode pem
 
 ~~~zig
 const std = @import("std");
 const pem = @import("zpem");
 
 pub fn main() !void {
-    // var pp = pem.Block.initWithType(allocator, "RSA PRIVATE");
+    const alloc = std.heap.page_allocator;
+    
+    // var pp = pem.Block.initWithType(alloc, "RSA PRIVATE");
     var pp = pem.Block.init(allocator);
     pp.type = "RSA PRIVATE";
     try pp.headers.put("TTTYYY", "dghW66666");
@@ -64,18 +62,18 @@ pub fn main() !void {
     pp.bytes = "pem bytes";
 
     const allocator = std.heap.page_allocator;
-    var encoded3 = try pem.encode(allocator, pp);
+    var encoded_pem = try pem.encode(allocator, pp);
 
-    std.debug.print("pem encode data: {s}\n", .{encoded3});
+    std.debug.print("pem encoded: {s}\n", .{encoded_pem});
 }
 ~~~
 
 
-### 开源协议
+### LICENSE
 
-*  本软件包遵循 `Apache2` 开源协议发布，在保留本软件包版权的情况下提供个人及商业免费使用。
+*  The library LICENSE is `Apache2`, using the library need keep the LICENSE.
 
 
-### 版权
+### Copyright
 
-*  本软件包所属版权归 deatil(https://github.com/deatil) 所有。
+*  Copyright deatil(https://github.com/deatil).

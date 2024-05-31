@@ -3,19 +3,19 @@ const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
-pub const getLineData = struct {
-    line: []const u8,
-    rest: []const u8,
-};
-
 pub fn contains(data: []const u8, sep: []const u8) bool {
-    var i = mem.indexOf(u8, data, sep);
+    const i = mem.indexOf(u8, data, sep);
     if (i != null) {
         return true;
     }
 
     return false;
 }
+
+pub const getLineData = struct {
+    line: []const u8,
+    rest: []const u8,
+};
 
 pub fn getLine(data: []const u8) getLineData {
     var i = mem.indexOf(u8, data, "\n").?;

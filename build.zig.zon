@@ -1,0 +1,11 @@
+.{
+    .name = "zpem",
+    .description = "A pem parse and encode library for Zig.",
+    .version = "1.1.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+        "src",
+    },
+}

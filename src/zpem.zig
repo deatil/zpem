@@ -3,6 +3,7 @@ const std = @import("std");
 const fmt = std.fmt;
 const mem = std.mem;
 const sort = std.sort;
+const testing = std.testing;
 const base64 = std.base64;
 const StringHashMap = std.hash_map.StringHashMap;
 const Allocator = mem.Allocator;
@@ -11,6 +12,8 @@ const bytes = @import("bytes.zig");
 
 /// pem block data.
 pub const Block = struct {
+    const Self = @This();
+    
     /// The pem type.
     type: []const u8,
     /// Optional headers.
@@ -18,34 +21,38 @@ pub const Block = struct {
     /// Decoded content of a PEM file.
     bytes: []const u8,
 
+    allocator: Allocator,
+
     /// init
     pub fn init(allocator: Allocator) Block {
-        var headers = StringHashMap([]const u8).init(allocator);
+        const headers = StringHashMap([]const u8).init(allocator);
         
         return .{
             .type = "",
             .headers = headers,
             .bytes = "",
+            .allocator = allocator,
         };
     }
 
     /// initWithType
     pub fn initWithType(allocator: Allocator, type_line: []const u8) Block {
-        var headers = StringHashMap([]const u8).init(allocator);
+        const headers = StringHashMap([]const u8).init(allocator);
         
         return .{
             .type = type_line,
             .headers = headers,
             .bytes = "",
+            .allocator = allocator,
         };
     }
 
     /// Frees any memory that was allocated during Pem decoding.
-    /// Must provide the same `Allocator` that was given to the decoder.
-    pub fn deinit(self: *Block, allocator: Allocator) void {
-        self.headers.deinit();
+    pub fn deinit(self: *Self) void {
+        var headers = self.headers;
+        headers.deinit();
         
-        allocator.free(self.bytes);
+        self.allocator.free(self.bytes);
         self.* = undefined;
     }
 };
@@ -236,8 +243,8 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
         try buf.appendSlice("\n");
     }
 
-    var bytes_len = base64.standard.Encoder.calcSize(b.bytes.len);
-    var buffer = try alloc.allocator().alloc(u8, bytes_len);
+    const bytes_len = base64.standard.Encoder.calcSize(b.bytes.len);
+    const buffer = try alloc.allocator().alloc(u8, bytes_len);
 
     const banse64_encoded = base64.standard.Encoder.encode(buffer, b.bytes);
 
@@ -298,10 +305,13 @@ test "ASN.1 type CERTIFICATE" {
         "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=\n" ++
         "-----END CERTIFICATE-----\n";
 
-    var pem = try decode(std.testing.allocator, byte);
-    defer pem.deinit(std.testing.allocator);
+    const alloc = std.heap.page_allocator;
+    var pem = try decode(alloc, byte);
+    defer pem.deinit();
 
-    try std.testing.expectEqual("CERTIFICATE", pem.type);
+    try testing.expectFmt("CERTIFICATE", "{s}", .{pem.type});
+    try testing.expect(pem.bytes.len > 0);
+    try testing.expectFmt("{ 30, 82, 1, 99, 30, 82, 1, 47, a0, 3, 2, 1, 2, 2, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 1e, 17, d, 31, 32, 30, 37, 30, 39, 30, 33, 31, 30, 33, 38, 5a, 17, d, 31, 33, 30, 37, 30, 39, 30, 33, 31, 30, 33, 37, 5a, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 5c, 30, d, 6, 9, 2a, 86, 48, 86, f7, d, 1, 1, 1, 5, 0, 3, 4b, 0, 30, 48, 2, 41, 0, bb, e0, 57, a3, e9, a2, 69, b0, c8, 1c, 7c, 7e, ca, ab, aa, ce, a3, 61, 47, 29, ff, 5e, d9, 9, 20, 81, d5, 71, 8b, 47, bc, 85, fe, 4b, 5c, 79, 12, b8, c, a0, 77, a1, c9, ca, 68, c5, b1, 2b, 66, 65, 51, e0, 60, aa, d5, 2d, 9d, 88, d9, 91, 15, 90, 91, b5, 2, 3, 1, 0, 1, a3, 81, 89, 30, 81, 86, 30, c, 6, 3, 55, 1d, 13, 1, 1, ff, 4, 2, 30, 0, 30, 20, 6, 3, 55, 1d, 4, 1, 1, ff, 4, 16, 30, 14, 30, e, 30, c, 6, a, 2b, 6, 1, 4, 1, 82, 37, 2, 1, 15, 3, 2, 7, 80, 30, 1d, 6, 3, 55, 1d, 25, 4, 16, 30, 14, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 2, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 3, 30, 35, 6, 3, 55, 1d, 1, 4, 2e, 30, 2c, 80, 10, 34, 8c, e9, d2, 4a, e2, 7, 62, 69, d5, af, 21, c0, 77, 2c, c, a1, 15, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 82, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 3, 41, 0, a8, ba, 1d, 10, 5a, 34, 42, f9, 47, 49, f9, ea, 7b, df, 72, 54, d, 69, 78, 83, 4f, 5e, f8, b9, ff, a5, a2, 3c, c0, e2, 58, 55, 22, 77, 34, 20, bc, 29, 9d, 9d, 62, cc, be, c, 94, 8f, 5e, 9, 21, e1, 55, 0, 47, 12, 9d, ae, 41, d5, c9, 7, e7, 79, 7, 28 }", "{x}", .{pem.bytes});
 }
 
 test "ASN.1 type CERTIFICATE + Explanatory Text" {
@@ -321,8 +331,86 @@ test "ASN.1 type CERTIFICATE + Explanatory Text" {
         "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=\n" ++
         "-----END CERTIFICATE-----\n";
 
-    var pem = try decode(std.testing.allocator, byte);
-    defer pem.deinit(std.testing.allocator);
+    const alloc = std.heap.page_allocator;
+    var pem = try decode(alloc, byte);
+    defer pem.deinit();
 
-    try std.testing.expectEqual("CERTIFICATE", pem.type);
+    try testing.expectFmt("CERTIFICATE", "{s}", .{pem.type});
+    try testing.expect(pem.bytes.len > 0);
+    try testing.expectFmt("{ 30, 82, 1, 99, 30, 82, 1, 47, a0, 3, 2, 1, 2, 2, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 1e, 17, d, 31, 32, 30, 37, 30, 39, 30, 33, 31, 30, 33, 38, 5a, 17, d, 31, 33, 30, 37, 30, 39, 30, 33, 31, 30, 33, 37, 5a, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 5c, 30, d, 6, 9, 2a, 86, 48, 86, f7, d, 1, 1, 1, 5, 0, 3, 4b, 0, 30, 48, 2, 41, 0, bb, e0, 57, a3, e9, a2, 69, b0, c8, 1c, 7c, 7e, ca, ab, aa, ce, a3, 61, 47, 29, ff, 5e, d9, 9, 20, 81, d5, 71, 8b, 47, bc, 85, fe, 4b, 5c, 79, 12, b8, c, a0, 77, a1, c9, ca, 68, c5, b1, 2b, 66, 65, 51, e0, 60, aa, d5, 2d, 9d, 88, d9, 91, 15, 90, 91, b5, 2, 3, 1, 0, 1, a3, 81, 89, 30, 81, 86, 30, c, 6, 3, 55, 1d, 13, 1, 1, ff, 4, 2, 30, 0, 30, 20, 6, 3, 55, 1d, 4, 1, 1, ff, 4, 16, 30, 14, 30, e, 30, c, 6, a, 2b, 6, 1, 4, 1, 82, 37, 2, 1, 15, 3, 2, 7, 80, 30, 1d, 6, 3, 55, 1d, 25, 4, 16, 30, 14, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 2, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 3, 30, 35, 6, 3, 55, 1d, 1, 4, 2e, 30, 2c, 80, 10, 34, 8c, e9, d2, 4a, e2, 7, 62, 69, d5, af, 21, c0, 77, 2c, c, a1, 15, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 82, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 3, 41, 0, a8, ba, 1d, 10, 5a, 34, 42, f9, 47, 49, f9, ea, 7b, df, 72, 54, d, 69, 78, 83, 4f, 5e, f8, b9, ff, a5, a2, 3c, c0, e2, 58, 55, 22, 77, 34, 20, bc, 29, 9d, 9d, 62, cc, be, c, 94, 8f, 5e, 9, 21, e1, 55, 0, 47, 12, 9d, ae, 41, d5, c9, 7, e7, 79, 7, 28 }", "{x}", .{pem.bytes});
 }
+
+test "ASN.1 type RSA PRIVATE With headers" {
+    const byte =
+        "-----BEGIN RSA PRIVATE-----\n" ++
+        "ID: RSA IDs\n" ++
+        "ABC: thsasd   \n" ++
+        "\n" ++
+        "MIIBmTCCAUegAwIBAgIBKjAJBgUrDgMCHQUAMBMxETAPBgNVBAMTCEF0bGFudGlz\n" ++
+        "MB4XDTEyMDcwOTAzMTAzOFoXDTEzMDcwOTAzMTAzN1owEzERMA8GA1UEAxMIQXRs\n" ++
+        "YW50aXMwXDANBgkqhkiG9w0BAQEFAANLADBIAkEAu+BXo+miabDIHHx+yquqzqNh\n" ++
+        "Ryn/XtkJIIHVcYtHvIX+S1x5ErgMoHehycpoxbErZmVR4GCq1S2diNmRFZCRtQID\n" ++
+        "AQABo4GJMIGGMAwGA1UdEwEB/wQCMAAwIAYDVR0EAQH/BBYwFDAOMAwGCisGAQQB\n" ++
+        "gjcCARUDAgeAMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDAzA1BgNVHQEE\n" ++
+        "LjAsgBA0jOnSSuIHYmnVryHAdywMoRUwEzERMA8GA1UEAxMIQXRsYW50aXOCASow\n" ++
+        "CQYFKw4DAh0FAANBAKi6HRBaNEL5R0n56nvfclQNaXiDT174uf+lojzA4lhVInc0\n" ++
+        "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=\n" ++
+        "-----END RSA PRIVATE-----\n";
+
+    const alloc = std.heap.page_allocator;
+    var pem = try decode(alloc, byte);
+    defer pem.deinit();
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
+    try testing.expect(pem.bytes.len > 0);
+
+    const header_1 = pem.headers.get("ID").?;
+    const header_2 = pem.headers.get("ABC").?;
+    try testing.expectFmt("RSA IDs", "{s}", .{header_1});
+    try testing.expectFmt("thsasd", "{s}", .{header_2});
+
+    try testing.expectFmt("{ 30, 82, 1, 99, 30, 82, 1, 47, a0, 3, 2, 1, 2, 2, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 1e, 17, d, 31, 32, 30, 37, 30, 39, 30, 33, 31, 30, 33, 38, 5a, 17, d, 31, 33, 30, 37, 30, 39, 30, 33, 31, 30, 33, 37, 5a, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 30, 5c, 30, d, 6, 9, 2a, 86, 48, 86, f7, d, 1, 1, 1, 5, 0, 3, 4b, 0, 30, 48, 2, 41, 0, bb, e0, 57, a3, e9, a2, 69, b0, c8, 1c, 7c, 7e, ca, ab, aa, ce, a3, 61, 47, 29, ff, 5e, d9, 9, 20, 81, d5, 71, 8b, 47, bc, 85, fe, 4b, 5c, 79, 12, b8, c, a0, 77, a1, c9, ca, 68, c5, b1, 2b, 66, 65, 51, e0, 60, aa, d5, 2d, 9d, 88, d9, 91, 15, 90, 91, b5, 2, 3, 1, 0, 1, a3, 81, 89, 30, 81, 86, 30, c, 6, 3, 55, 1d, 13, 1, 1, ff, 4, 2, 30, 0, 30, 20, 6, 3, 55, 1d, 4, 1, 1, ff, 4, 16, 30, 14, 30, e, 30, c, 6, a, 2b, 6, 1, 4, 1, 82, 37, 2, 1, 15, 3, 2, 7, 80, 30, 1d, 6, 3, 55, 1d, 25, 4, 16, 30, 14, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 2, 6, 8, 2b, 6, 1, 5, 5, 7, 3, 3, 30, 35, 6, 3, 55, 1d, 1, 4, 2e, 30, 2c, 80, 10, 34, 8c, e9, d2, 4a, e2, 7, 62, 69, d5, af, 21, c0, 77, 2c, c, a1, 15, 30, 13, 31, 11, 30, f, 6, 3, 55, 4, 3, 13, 8, 41, 74, 6c, 61, 6e, 74, 69, 73, 82, 1, 2a, 30, 9, 6, 5, 2b, e, 3, 2, 1d, 5, 0, 3, 41, 0, a8, ba, 1d, 10, 5a, 34, 42, f9, 47, 49, f9, ea, 7b, df, 72, 54, d, 69, 78, 83, 4f, 5e, f8, b9, ff, a5, a2, 3c, c0, e2, 58, 55, 22, 77, 34, 20, bc, 29, 9d, 9d, 62, cc, be, c, 94, 8f, 5e, 9, 21, e1, 55, 0, 47, 12, 9d, ae, 41, d5, c9, 7, e7, 79, 7, 28 }", "{x}", .{pem.bytes});
+
+}
+
+test "encode pem bin" {
+    const alloc = std.heap.page_allocator;
+    
+    var pp = Block.init(alloc);
+    pp.type = "RSA PRIVATE";
+    try pp.headers.put("TTTYYY", "dghW66666");
+    try pp.headers.put("Proc-Type", "4,Encond");
+    pp.bytes = "pem bytes";
+
+    const allocator = std.heap.page_allocator;
+    const encoded_pem = try encode(allocator, pp);
+
+    const check =
+        \\-----BEGIN RSA PRIVATE-----
+        \\Proc-Type:4,Encond
+        \\TTTYYY:dghW66666
+        \\
+        \\cGVtIGJ5dGVz
+        \\-----END RSA PRIVATE-----
+        \\
+    ;
+
+    try testing.expectFmt(check, "{s}", .{encoded_pem});
+
+    // =====
+
+    const alloc2 = std.heap.page_allocator;
+    var pem = try decode(alloc2, encoded_pem);
+    defer pem.deinit();
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
+    try testing.expect(pem.bytes.len > 0);
+    try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
+
+    const header_1 = pem.headers.get("Proc-Type").?;
+    const header_2 = pem.headers.get("TTTYYY").?;
+    try testing.expectFmt("4,Encond", "{s}", .{header_1});
+    try testing.expectFmt("dghW66666", "{s}", .{header_2});
+    
+}
+
