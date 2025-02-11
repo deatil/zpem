@@ -5,7 +5,43 @@ A pem parse and encode library for Zig.
 
 ### Env
 
- - Zig >= 0.12
+ - Zig >= 0.14.0-dev.2851+b074fb7dd
+
+
+ ### Adding zpem as a dependency
+
+Add the dependency to your project:
+
+```sh
+zig fetch --save=zpem git+https://github.com/deatil/zpem#main
+```
+
+or use local path to add dependency at `build.zig.zon` file
+
+```zig
+.{
+    .dependencies = .{
+        .zpem = .{
+            .path = "./lib/zpem",
+        },
+        ...
+    },
+    ...
+}
+```
+
+And the following to your `build.zig` file:
+
+```zig
+    const zpem_dep = b.dependency("zpem", .{});
+    exe.root_module.addImport("zpem", zpem_dep.module("zpem"));
+```
+
+The `zpem` structure can be imported in your application with:
+
+```zig
+const zpem = @import("zpem");
+```
 
 
 ### Get Starting
@@ -14,7 +50,7 @@ A pem parse and encode library for Zig.
 
 ~~~zig
 const std = @import("std");
-const pem = @import("zpem");
+const zpem = @import("zpem");
 
 pub fn main() !void {
     const bytes =
@@ -33,8 +69,8 @@ pub fn main() !void {
         "-----END RSA PRIVATE-----\n";
 
     const allocator = std.heap.page_allocator;
-    var p = try pem.decode(allocator, bytes);
-    defer p.deinit(allocator);
+    var p = try zpem.decode(allocator, bytes);
+    defer p.deinit();
 
     std.debug.print("pem type: {s}\n", .{p.type});
     std.debug.print("pem bytes: {x}\n", .{p.bytes});
@@ -49,20 +85,20 @@ pub fn main() !void {
 
 ~~~zig
 const std = @import("std");
-const pem = @import("zpem");
+const zpem = @import("zpem");
 
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
     
-    // var pp = pem.Block.initWithType(alloc, "RSA PRIVATE");
-    var pp = pem.Block.init(allocator);
+    // var pp = zpem.Block.initWithType(alloc, "RSA PRIVATE");
+    var pp = zpem.Block.init(allocator);
     pp.type = "RSA PRIVATE";
     try pp.headers.put("TTTYYY", "dghW66666");
     try pp.headers.put("Proc-Type", "4,Encond");
     pp.bytes = "pem bytes";
 
     const allocator = std.heap.page_allocator;
-    var encoded_pem = try pem.encode(allocator, pp);
+    var encoded_pem = try zpem.encode(allocator, pp);
 
     std.debug.print("pem encoded: {s}\n", .{encoded_pem});
 }
