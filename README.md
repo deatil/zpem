@@ -90,15 +90,15 @@ const zpem = @import("zpem");
 pub fn main() !void {
     const alloc = std.heap.page_allocator;
     
-    // var pp = zpem.Block.initWithType(alloc, "RSA PRIVATE");
-    var pp = zpem.Block.init(allocator);
-    pp.type = "RSA PRIVATE";
-    try pp.headers.put("TTTYYY", "dghW66666");
-    try pp.headers.put("Proc-Type", "4,Encond");
-    pp.bytes = "pem bytes";
+    var b = zpem.Block.init(allocator);
+    b.type = "RSA PRIVATE";
+    try b.headers.put("TTTYYY", "dghW66666");
+    try b.headers.put("Proc-Type", "4,Encond");
+    try b.bytes.appendSlice("pem bytes");
 
     const allocator = std.heap.page_allocator;
-    var encoded_pem = try zpem.encode(allocator, pp);
+    var encoded_pem = try zpem.encode(allocator, b);
+    defer alloc.free(encoded_pem);
 
     std.debug.print("pem encoded: {s}\n", .{encoded_pem});
 }
