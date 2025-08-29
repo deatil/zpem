@@ -161,7 +161,7 @@ pub fn decode(allocator: Allocator, data: []const u8) !Block {
         const base64_decoded = try base64.decode(decoded_data, base64_data, .standard);
 
         const pw = &p.bytes.writer;
-        try pw.print("{s}", .{base64_decoded});
+        try pw.writeAll(base64_decoded);
 
         return p;
     }
@@ -172,10 +172,10 @@ const nl = "\n";
 const pem_line_length = 64;
 
 fn appendHeader(list: *Writer, k: []const u8, v: []const u8) !void {
-    try list.print("{s}", .{k});
-    try list.print("{s}", .{":"});
-    try list.print("{s}", .{v});
-    try list.print("{s}", .{"\n"});
+    try list.writeAll(k);
+    try list.writeAll(":");
+    try list.writeAll(v);
+    try list.writeAll("\n");
 }
 
 /// Encodes pem bytes.
@@ -201,10 +201,10 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
     defer buf.deinit();
 
     const buf_writer = &buf.writer;
-    try buf_writer.print("{s}", .{pem_start[1..]});
+    try buf_writer.writeAll(pem_start[1..]);
 
-    try buf_writer.print("{s}", .{b.type});
-    try buf_writer.print("{s}", .{"-----\n"});
+    try buf_writer.writeAll(b.type);
+    try buf_writer.writeAll("-----\n");
 
     if (b.headers.count() > 0) {
         const proc_type = "Proc-Type";
@@ -254,7 +254,7 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
             }
         }
 
-        try buf_writer.print("{s}", .{"\n"});
+        try buf_writer.writeAll("\n");
     }
 
     var b_bytes = b.bytes;
@@ -270,20 +270,20 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
     var idx: usize = 0;
     while (true) {
         if (base64_encoded[idx..].len < pem_line_length) {
-            try buf_writer.print("{s}", .{base64_encoded[idx..]});
-            try buf_writer.print("{s}", .{nl});
+            try buf_writer.writeAll(base64_encoded[idx..]);
+            try buf_writer.writeAll(nl);
             break;
         } else {
-            try buf_writer.print("{s}", .{base64_encoded[idx..(idx + pem_line_length)]});
-            try buf_writer.print("{s}", .{nl});
+            try buf_writer.writeAll(base64_encoded[idx..(idx + pem_line_length)]);
+            try buf_writer.writeAll(nl);
 
             idx += pem_line_length;
         }
     }
 
-    try buf_writer.print("{s}", .{pem_end[1..]});
-    try buf_writer.print("{s}", .{b.type});
-    try buf_writer.print("{s}", .{"-----\n"});
+    try buf_writer.writeAll(pem_end[1..]);
+    try buf_writer.writeAll(b.type);
+    try buf_writer.writeAll("-----\n");
 
     return buf.toOwnedSliceSentinel(0);
 }
@@ -542,7 +542,7 @@ test "encode pem bin" {
     try pp.headers.put("Proc-Type", "4,Encond");
 
     const w = &pp.bytes.writer;
-    try w.print("{s}", .{"pem bytes"});
+    try w.writeAll("pem bytes");
 
     defer pp.deinit();
 
