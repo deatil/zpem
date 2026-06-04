@@ -5,7 +5,7 @@ A pem parse and encode library for Zig.
 
 ### Env
 
- - Zig >= 0.15.1
+ - Zig >= 0.16.0
 
 
  ### Adding zpem as a dependency
@@ -52,7 +52,9 @@ const zpem = @import("zpem");
 const std = @import("std");
 const zpem = @import("zpem");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    _ = init;
+
     const bytes =
         "-----BEGIN RSA PRIVATE-----\n" ++
         "ABC: thsasd   \n" ++
@@ -87,7 +89,9 @@ pub fn main() !void {
 const std = @import("std");
 const zpem = @import("zpem");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    _ = init;
+
     const alloc = std.heap.page_allocator;
     
     var b = zpem.Block.init(allocator);

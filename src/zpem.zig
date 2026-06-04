@@ -8,8 +8,8 @@ const testing = std.testing;
 const base64 = std.crypto.codecs.base64;
 const Allocator = std.mem.Allocator;
 
-const Writer = std.io.Writer;
-const ArraySlice = std.io.Writer.Allocating;
+const Writer = std.Io.Writer;
+const ArraySlice = std.Io.Writer.Allocating;
 const StringKeyHashMap = std.hash_map.StringHashMap([]const u8);
 
 /// A Block represents a PEM encoded structure.
@@ -319,7 +319,7 @@ fn getLine(data: []const u8) LineData {
     }
 
     return .{
-        .line = mem.trimRight(u8, data[0..i], " \t"),
+        .line = mem.trimEnd(u8, data[0..i], " \t"),
         .rest = data[j..],
     };
 }
