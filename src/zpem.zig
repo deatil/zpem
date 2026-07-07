@@ -7,9 +7,8 @@ const sort = std.sort;
 const testing = std.testing;
 const base64 = std.crypto.codecs.base64;
 const Allocator = std.mem.Allocator;
-
 const Writer = std.Io.Writer;
-const ArraySlice = std.Io.Writer.Allocating;
+const ArraySlice = Writer.Allocating;
 const StringKeyHashMap = std.hash_map.StringHashMap([]const u8);
 
 /// A Block represents a PEM encoded structure.

@@ -75,7 +75,7 @@ pub fn main(init: std.process.Init) !void {
     defer p.deinit();
 
     std.debug.print("pem type: {s}\n", .{p.type});
-    std.debug.print("pem bytes: {x}\n", .{p.bytes});
+    std.debug.print("pem bytes: {x}\n", .{p.bytes.written()});
 
     // get header data
     const header = p.headers.get("ABC").?;
