@@ -47,10 +47,21 @@ pub const Block = struct {
 
     /// Frees any memory that was allocated during Pem decoding.
     pub fn deinit(self: *Self) void {
+        self.alloc.free(self.type);
+        self.alloc.free(self.bytes);
+
         var headers = self.headers;
         headers.deinit();
+    }
 
-        self.alloc.free(self.bytes);
+    /// set pem type
+    pub fn withType(self: *Self, t: []const u8) !void {
+        self.type = try self.alloc.dupe(u8, t[0..]);
+    }
+
+    /// get pem type
+    pub fn getType(self: *const Self) ![]const u8 {
+        return self.alloc.dupe(u8, self.type[0..]);
     }
 
     /// set der bytes
@@ -104,7 +115,7 @@ pub fn decode(allocator: Allocator, data: []const u8) !Block {
         rest = line_data.rest;
 
         var p = Block.init(allocator);
-        p.type = type_line;
+        try p.withType(type_line);
 
         while (true) {
             if (rest.len == 0) {
@@ -327,7 +338,7 @@ fn removeAllSpacesAndTabs(alloc: Allocator, data: []const u8) ![:0]u8 {
     defer buf.deinit(alloc);
 
     for (data) |b| {
-        if (b == ' ' or b == '\t' or b == '\n' or b == '\r') {
+        if (std.ascii.isWhitespace(b) or b == '\n') {
             continue;
         }
 
@@ -535,7 +546,7 @@ test "encode pem bin" {
     const alloc = testing.allocator;
 
     var pp = Block.init(alloc);
-    pp.type = "RSA PRIVATE";
+    try pp.withType("RSA PRIVATE");
     try pp.headers.put("TTTYYY", "dghW66666");
     try pp.headers.put("Proc-Type", "4,Encond");
     try pp.withBytes("pem bytes");
@@ -560,13 +571,19 @@ test "encode pem bin" {
     var pem = try decode(alloc, check);
     defer pem.deinit();
 
-    try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
-    try testing.expect(pem.bytes.len > 0);
+    const tt = try pem.getType();
+    defer alloc.free(tt);
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{tt});
+    try testing.expect(tt.len > 0);
 
     const bb = try pem.getBytes();
     defer alloc.free(bb);
 
     try testing.expectFmt("pem bytes", "{s}", .{bb});
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
+    try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
 
     const header_1 = pem.headers.get("Proc-Type").?;
     const header_2 = pem.headers.get("TTTYYY").?;
