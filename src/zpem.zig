@@ -8,8 +8,9 @@ const testing = std.testing;
 const base64 = std.crypto.codecs.base64;
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
-const ArraySlice = Writer.Allocating;
-const StringKeyHashMap = std.hash_map.StringHashMap([]const u8);
+const Allocating = Writer.Allocating;
+
+const HeadersHashMap = std.hash_map.StringHashMap([]const u8);
 
 /// A Block represents a PEM encoded structure.
 ///
@@ -25,15 +26,16 @@ pub const Block = struct {
     /// The type, taken from the preamble (i.e. "RSA PRIVATE KEY").
     type: []const u8,
     /// Optional headers.
-    headers: StringKeyHashMap,
+    headers: HeadersHashMap,
     /// The decoded bytes of the contents. Typically a DER encoded ASN.1 structure.
     bytes: []const u8,
+    /// zig Allocator
     alloc: Allocator,
 
     const Self = @This();
 
     pub fn init(alloc: Allocator) Block {
-        const headers = StringKeyHashMap.init(alloc);
+        const headers = HeadersHashMap.init(alloc);
 
         return .{
             .type = "",
@@ -49,8 +51,6 @@ pub const Block = struct {
         headers.deinit();
 
         self.alloc.free(self.bytes);
-
-        self.* = undefined;
     }
 
     /// set der bytes
@@ -200,7 +200,7 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
         }
     }
 
-    var buf = ArraySlice.init(allocator);
+    var buf = Allocating.init(allocator);
     defer buf.deinit();
 
     const buf_writer = &buf.writer;
@@ -557,12 +557,16 @@ test "encode pem bin" {
 
     try testing.expectFmt(check, "{s}", .{encoded_pem});
 
-    var pem = try decode(alloc, encoded_pem);
+    var pem = try decode(alloc, check);
     defer pem.deinit();
 
     try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
     try testing.expect(pem.bytes.len > 0);
-    try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
+
+    const bb = try pem.getBytes();
+    defer alloc.free(bb);
+
+    try testing.expectFmt("pem bytes", "{s}", .{bb});
 
     const header_1 = pem.headers.get("Proc-Type").?;
     const header_2 = pem.headers.get("TTTYYY").?;
