@@ -56,6 +56,7 @@ pub const Block = struct {
 
     /// set pem type
     pub fn withType(self: *Self, t: []const u8) !void {
+        self.alloc.free(self.type);
         self.type = try self.alloc.dupe(u8, t[0..]);
     }
 
@@ -66,6 +67,7 @@ pub const Block = struct {
 
     /// set der bytes
     pub fn withBytes(self: *Self, b: []const u8) !void {
+        self.alloc.free(self.bytes);
         self.bytes = try self.alloc.dupe(u8, b[0..]);
     }
 
@@ -581,6 +583,56 @@ test "encode pem bin" {
     defer alloc.free(bb);
 
     try testing.expectFmt("pem bytes", "{s}", .{bb});
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
+    try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
+
+    const header_1 = pem.headers.get("Proc-Type").?;
+    const header_2 = pem.headers.get("TTTYYY").?;
+    try testing.expectFmt("4,Encond", "{s}", .{header_1});
+    try testing.expectFmt("dghW66666", "{s}", .{header_2});
+}
+
+test "encode pem bin and with check" {
+    const alloc = testing.allocator;
+
+    var pp = Block.init(alloc);
+    try pp.withType("RSA PRIVATE111");
+    try pp.headers.put("TTTYYY", "dghW66666");
+    try pp.headers.put("Proc-Type", "4,Encond");
+    try pp.withBytes("pem bytes222");
+
+    try testing.expectFmt("RSA PRIVATE111", "{s}", .{pp.type});
+    try testing.expectFmt("pem bytes222", "{s}", .{pp.bytes});
+
+    try pp.withType("");
+    try testing.expectFmt("", "{s}", .{pp.type});
+
+    try pp.withType("RSA PRIVATE");
+    try pp.withBytes("pem bytes");
+
+    try testing.expectFmt("RSA PRIVATE", "{s}", .{pp.type});
+    try testing.expectFmt("pem bytes", "{s}", .{pp.bytes});
+
+    defer pp.deinit();
+
+    const encoded_pem = try encode(alloc, pp);
+    defer alloc.free(encoded_pem);
+
+    const check =
+        \\-----BEGIN RSA PRIVATE-----
+        \\Proc-Type:4,Encond
+        \\TTTYYY:dghW66666
+        \\
+        \\cGVtIGJ5dGVz
+        \\-----END RSA PRIVATE-----
+        \\
+    ;
+
+    try testing.expectFmt(check, "{s}", .{encoded_pem});
+
+    var pem = try decode(alloc, check);
+    defer pem.deinit();
 
     try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
     try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
