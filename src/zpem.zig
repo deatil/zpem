@@ -27,20 +27,19 @@ pub const Block = struct {
     /// Optional headers.
     headers: StringKeyHashMap,
     /// The decoded bytes of the contents. Typically a DER encoded ASN.1 structure.
-    bytes: ArraySlice,
-    allocator: Allocator,
+    bytes: []const u8,
+    alloc: Allocator,
 
     const Self = @This();
 
-    pub fn init(allocator: Allocator) Block {
-        const headers = StringKeyHashMap.init(allocator);
-        const bytes = ArraySlice.init(allocator);
+    pub fn init(alloc: Allocator) Block {
+        const headers = StringKeyHashMap.init(alloc);
 
         return .{
             .type = "",
             .headers = headers,
-            .bytes = bytes,
-            .allocator = allocator,
+            .bytes = "",
+            .alloc = alloc,
         };
     }
 
@@ -49,9 +48,19 @@ pub const Block = struct {
         var headers = self.headers;
         headers.deinit();
 
-        self.bytes.deinit();
+        self.alloc.free(self.bytes);
 
         self.* = undefined;
+    }
+
+    /// set der bytes
+    pub fn withBytes(self: *Self, b: []const u8) !void {
+        self.bytes = try self.alloc.dupe(u8, b[0..]);
+    }
+
+    /// get der bytes
+    pub fn getBytes(self: *const Self) ![]const u8 {
+        return self.alloc.dupe(u8, self.bytes[0..]);
     }
 };
 
@@ -152,15 +161,10 @@ pub fn decode(allocator: Allocator, data: []const u8) !Block {
         const base64_data = try removeAllSpacesAndTabs(allocator, rest[0..end_index]);
         defer allocator.free(base64_data);
 
-        const base64_decode_len = try base64.decodedLen(base64_data.len, .standard);
-        const decoded_data = try allocator.alloc(u8, base64_decode_len);
+        const base64_decoded = try base64Decode(allocator, base64_data);
+        defer allocator.free(base64_decoded);
 
-        defer allocator.free(decoded_data);
-
-        const base64_decoded = try base64.decode(decoded_data, base64_data, .standard);
-
-        const pw = &p.bytes.writer;
-        try pw.writeAll(base64_decoded);
+        try p.withBytes(base64_decoded);
 
         return p;
     }
@@ -256,15 +260,8 @@ pub fn encode(allocator: Allocator, b: Block) ![:0]u8 {
         try buf_writer.writeAll("\n");
     }
 
-    var b_bytes = b.bytes;
-    const bytes_slice = b_bytes.written();
-
-    const bytes_len = base64.encodedLen(bytes_slice.len, .standard);
-    const buffer = try allocator.alloc(u8, bytes_len);
-
-    defer allocator.free(buffer);
-
-    const base64_encoded = try base64.encode(buffer, bytes_slice, .standard);
+    const base64_encoded = try base64Encode(allocator, b.bytes);
+    defer allocator.free(base64_encoded);
 
     var idx: usize = 0;
     while (true) {
@@ -390,9 +387,20 @@ fn base64Encode(alloc: Allocator, input: []const u8) ![]const u8 {
     const encode_len = base64.encodedLen(input.len, .standard);
     const buffer = try alloc.alloc(u8, encode_len);
 
-    const res = try base64.encode(buffer, input, .standard);
+    defer alloc.free(buffer);
 
-    return res;
+    const res = try base64.encode(buffer, input, .standard);
+    return alloc.dupe(u8, res[0..]);
+}
+
+fn base64Decode(alloc: Allocator, input: []const u8) ![]const u8 {
+    const decode_len = try base64.decodedLen(input.len, .standard);
+    const buffer = try alloc.alloc(u8, decode_len);
+
+    defer alloc.free(buffer);
+
+    const res = try base64.decode(buffer, input, .standard);
+    return alloc.dupe(u8, res[0..]);
 }
 
 test "ASN.1 type CERTIFICATE" {
@@ -415,7 +423,7 @@ test "ASN.1 type CERTIFICATE" {
     defer pem.deinit();
 
     try testing.expectFmt("CERTIFICATE", "{s}", .{pem.type});
-    try testing.expect(pem.bytes.written().len > 0);
+    try testing.expect(pem.bytes.len > 0);
 
     const check =
         "MIIBmTCCAUegAwIBAgIBKjAJBgUrDgMCHQUAMBMxETAPBgNVBAMTCEF0bGFudGlz" ++
@@ -428,10 +436,7 @@ test "ASN.1 type CERTIFICATE" {
         "CQYFKw4DAh0FAANBAKi6HRBaNEL5R0n56nvfclQNaXiDT174uf+lojzA4lhVInc0" ++
         "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=";
 
-    const b = try pem.bytes.toOwnedSlice();
-    defer alloc.free(b);
-
-    const bytes_encoded = try base64Encode(alloc, b);
+    const bytes_encoded = try base64Encode(alloc, pem.bytes);
     defer alloc.free(bytes_encoded);
 
     try testing.expectEqualStrings(check, bytes_encoded);
@@ -460,7 +465,7 @@ test "ASN.1 type CERTIFICATE + Explanatory Text" {
     defer pem.deinit();
 
     try testing.expectFmt("CERTIFICATE", "{s}", .{pem.type});
-    try testing.expect(pem.bytes.written().len > 0);
+    try testing.expect(pem.bytes.len > 0);
 
     const check =
         "MIIBmTCCAUegAwIBAgIBKjAJBgUrDgMCHQUAMBMxETAPBgNVBAMTCEF0bGFudGlz" ++
@@ -473,10 +478,7 @@ test "ASN.1 type CERTIFICATE + Explanatory Text" {
         "CQYFKw4DAh0FAANBAKi6HRBaNEL5R0n56nvfclQNaXiDT174uf+lojzA4lhVInc0" ++
         "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=";
 
-    const b = try pem.bytes.toOwnedSlice();
-    defer alloc.free(b);
-
-    const bytes_encoded = try base64Encode(alloc, b);
+    const bytes_encoded = try base64Encode(alloc, pem.bytes);
     defer alloc.free(bytes_encoded);
 
     try testing.expectEqualStrings(check, bytes_encoded);
@@ -505,7 +507,7 @@ test "ASN.1 type RSA PRIVATE With headers" {
     defer pem.deinit();
 
     try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
-    try testing.expect(pem.bytes.written().len > 0);
+    try testing.expect(pem.bytes.len > 0);
 
     const header_1 = pem.headers.get("ID").?;
     const header_2 = pem.headers.get("ABC").?;
@@ -523,10 +525,7 @@ test "ASN.1 type RSA PRIVATE With headers" {
         "CQYFKw4DAh0FAANBAKi6HRBaNEL5R0n56nvfclQNaXiDT174uf+lojzA4lhVInc0" ++
         "ILwpnZ1izL4MlI9eCSHhVQBHEp2uQdXJB+d5Byg=";
 
-    const b = try pem.bytes.toOwnedSlice();
-    defer alloc.free(b);
-
-    const bytes_encoded = try base64Encode(alloc, b);
+    const bytes_encoded = try base64Encode(alloc, pem.bytes);
     defer alloc.free(bytes_encoded);
 
     try testing.expectEqualStrings(check, bytes_encoded);
@@ -539,9 +538,7 @@ test "encode pem bin" {
     pp.type = "RSA PRIVATE";
     try pp.headers.put("TTTYYY", "dghW66666");
     try pp.headers.put("Proc-Type", "4,Encond");
-
-    const w = &pp.bytes.writer;
-    try w.writeAll("pem bytes");
+    try pp.withBytes("pem bytes");
 
     defer pp.deinit();
 
@@ -564,11 +561,8 @@ test "encode pem bin" {
     defer pem.deinit();
 
     try testing.expectFmt("RSA PRIVATE", "{s}", .{pem.type});
-    try testing.expect(pem.bytes.written().len > 0);
-
-    const bb = pem.bytes.written();
-
-    try testing.expectFmt("pem bytes", "{s}", .{bb});
+    try testing.expect(pem.bytes.len > 0);
+    try testing.expectFmt("pem bytes", "{s}", .{pem.bytes});
 
     const header_1 = pem.headers.get("Proc-Type").?;
     const header_2 = pem.headers.get("TTTYYY").?;

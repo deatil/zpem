@@ -1,7 +1,7 @@
 .{
     .name = .zpem,
     .description = "A pem parse and encode library for Zig.",
-    .version = "1.4.1",
+    .version = "1.5.0",
     .fingerprint = 0x5abe75b38c882bd6,
     .minimum_zig_version = "0.16.0",
     .paths = .{
