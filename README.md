@@ -91,11 +91,12 @@ const zpem = @import("zpem");
 pub fn main(init: std.process.Init) !void {
     const alloc = init.arena.allocator();
     
-    var b = zpem.Block.init(allocator);
+    var b = zpem.Block.init(alloc);
     try b.withType("RSA PRIVATE");
     try b.headers.put("TTTYYY", "dghW66666");
     try b.headers.put("Proc-Type", "4,Encond");
     try b.withBytes("pem bytes");
+    defer b.deinit();
 
     var encoded_pem = try zpem.encode(alloc, b);
     defer alloc.free(encoded_pem);
