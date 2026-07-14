@@ -92,7 +92,7 @@ pub fn main(init: std.process.Init) !void {
     const alloc = init.arena.allocator();
     
     var b = zpem.Block.init(allocator);
-    b.type = "RSA PRIVATE";
+    try b.withType("RSA PRIVATE");
     try b.headers.put("TTTYYY", "dghW66666");
     try b.headers.put("Proc-Type", "4,Encond");
     try b.withBytes("pem bytes");
