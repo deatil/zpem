@@ -375,6 +375,10 @@ fn cut(s: []const u8, sep: []const u8) CutData {
 /// TrimSpace returns a subslice of s by slicing off all leading and
 /// trailing white space, as defined by Unicode.
 fn trimSpace(s: []const u8) []const u8 {
+    if (s.len == 0) {
+        return "";
+    }
+
     var start: usize = 0;
     while (start < s.len) : (start += 1) {
         if (!std.ascii.isWhitespace(s[start])) {
@@ -382,15 +386,15 @@ fn trimSpace(s: []const u8) []const u8 {
         }
     }
 
-    var stop = s.len - 1;
+    if (start == s.len) {
+        return "";
+    }
+
+    var stop: usize = s.len - 1;
     while (stop > start) : (stop -= 1) {
         if (!std.ascii.isWhitespace(s[stop])) {
             break;
         }
-    }
-
-    if (start == stop) {
-        return "";
     }
 
     return s[start..(stop + 1)];
@@ -414,6 +418,73 @@ fn base64Decode(alloc: Allocator, input: []const u8) ![]const u8 {
 
     const res = try base64.decode(buffer, input, .standard);
     return alloc.dupe(u8, res[0..]);
+}
+
+test "cut" {
+    const buf = "abcdft)098k";
+
+    const res = cut(buf, ")");
+    try testing.expectFmt("abcdft", "{s}", .{res.before});
+    try testing.expectFmt("098k", "{s}", .{res.after});
+    try testing.expectEqual(true, res.found);
+
+    const res2 = cut(buf, "+");
+    try testing.expectFmt("abcdft)098k", "{s}", .{res2.before});
+    try testing.expectFmt("", "{s}", .{res2.after});
+    try testing.expectEqual(false, res2.found);
+}
+
+test "getLine" {
+    const buf =
+        \\abcdft
+        \\098k
+    ;
+
+    const res = getLine(buf);
+    try testing.expectFmt("abcdft", "{s}", .{res.line});
+    try testing.expectFmt("098k", "{s}", .{res.rest});
+
+    const buf2 =
+        \\abcdft
+    ;
+
+    const res2 = getLine(buf2);
+    try testing.expectFmt("abcdft", "{s}", .{res2.line});
+    try testing.expectFmt("", "{s}", .{res2.rest});
+}
+
+test "trimSpace" {
+    try testing.expectFmt("", "{s}", .{trimSpace("")});
+    try testing.expectFmt("a", "{s}", .{trimSpace("a")});
+    try testing.expectFmt("a", "{s}", .{trimSpace(" a ")});
+    try testing.expectFmt("abcde", "{s}", .{trimSpace(" abcde ")});
+    try testing.expectFmt("abcde ||", "{s}", .{trimSpace(" abcde ||")});
+    try testing.expectFmt("||     abcde", "{s}", .{trimSpace("||     abcde    ")});
+}
+
+fn testRemoveAllSpacesAndTabs(alloc: Allocator, s: []const u8, check: []const u8) !void {
+    const res = try removeAllSpacesAndTabs(alloc, s);
+    defer alloc.free(res);
+
+    try testing.expectFmt(check, "{s}", .{res});
+}
+
+test "removeAllSpacesAndTabs" {
+    const alloc = testing.allocator;
+
+    try testRemoveAllSpacesAndTabs(alloc, "", "");
+    try testRemoveAllSpacesAndTabs(alloc, "a", "a");
+    try testRemoveAllSpacesAndTabs(alloc, " a ", "a");
+    try testRemoveAllSpacesAndTabs(alloc, " abcde ", "abcde");
+    try testRemoveAllSpacesAndTabs(alloc, " abcde  ||", "abcde||");
+    try testRemoveAllSpacesAndTabs(alloc, "||     abcde    ", "||abcde");
+    try testRemoveAllSpacesAndTabs(alloc, "||     abcde    -", "||abcde-");
+
+    const buf =
+        \\abcdft
+        \\098k ui
+    ;
+    try testRemoveAllSpacesAndTabs(alloc, buf, "abcdft098kui");
 }
 
 test "ASN.1 type CERTIFICATE" {
