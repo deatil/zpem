@@ -455,6 +455,7 @@ test "getLine" {
 
 test "trimSpace" {
     try testing.expectFmt("", "{s}", .{trimSpace("")});
+    try testing.expectFmt("", "{s}", .{trimSpace("     ")});
     try testing.expectFmt("a", "{s}", .{trimSpace("a")});
     try testing.expectFmt("a", "{s}", .{trimSpace(" a ")});
     try testing.expectFmt("abcde", "{s}", .{trimSpace(" abcde ")});
