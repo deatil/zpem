@@ -5,7 +5,7 @@ A pem parse and encode library for Zig.
 
 ### Env
 
- - Zig >= 0.16.0
+ - Zig >= 0.17.0
 
 
  ### Adding zpem as a dependency

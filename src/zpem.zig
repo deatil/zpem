@@ -473,8 +473,10 @@ test "removeAllSpacesAndTabs" {
     const alloc = testing.allocator;
 
     try testRemoveAllSpacesAndTabs(alloc, "", "");
+    try testRemoveAllSpacesAndTabs(alloc, "     ", "");
     try testRemoveAllSpacesAndTabs(alloc, "a", "a");
     try testRemoveAllSpacesAndTabs(alloc, " a ", "a");
+    try testRemoveAllSpacesAndTabs(alloc, "     abc    ", "abc");
     try testRemoveAllSpacesAndTabs(alloc, " abcde ", "abcde");
     try testRemoveAllSpacesAndTabs(alloc, " abcde  ||", "abcde||");
     try testRemoveAllSpacesAndTabs(alloc, "||     abcde    ", "||abcde");
