@@ -23,14 +23,14 @@ const HeadersHashMap = std.hash_map.StringHashMap([]const u8);
 ///
 /// where Headers is a possibly empty sequence of Key: Value lines.
 pub const Block = struct {
+    /// zig Allocator
+    alloc: Allocator,
     /// The type, taken from the preamble (i.e. "RSA PRIVATE KEY").
     type: []const u8,
     /// Optional headers.
     headers: HeadersHashMap,
     /// The decoded bytes of the contents. Typically a DER encoded ASN.1 structure.
     bytes: []const u8,
-    /// zig Allocator
-    alloc: Allocator,
 
     const Self = @This();
 
@@ -61,7 +61,7 @@ pub const Block = struct {
     }
 
     /// get pem type
-    pub fn getType(self: *const Self) ![]const u8 {
+    pub fn getType(self: Self) ![]const u8 {
         return self.alloc.dupe(u8, self.type[0..]);
     }
 
@@ -72,7 +72,7 @@ pub const Block = struct {
     }
 
     /// get der bytes
-    pub fn getBytes(self: *const Self) ![]const u8 {
+    pub fn getBytes(self: Self) ![]const u8 {
         return self.alloc.dupe(u8, self.bytes[0..]);
     }
 };

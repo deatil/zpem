@@ -73,6 +73,12 @@ pub fn main(init: std.process.Init) !void {
     var p = try zpem.decode(alloc, pem);
     defer p.deinit();
 
+    // const typ = try p.getType();
+    // defer alloc.free(typ);
+
+    // const bytes = try p.getBytes();
+    // defer alloc.free(bytes);
+
     std.debug.print("pem type: {s}\n", .{p.type});
     std.debug.print("pem bytes: {x}\n", .{p.bytes});
 

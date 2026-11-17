@@ -7,14 +7,27 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  test_dev:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.17.1
+      - name: Test
+        run: zig build test --summary all
+
+  test_only:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.17.0
       - name: Test
